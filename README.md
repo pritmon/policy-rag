@@ -8,6 +8,7 @@
 ![AWS](https://img.shields.io/badge/AWS_Bedrock-Nova_%2B_Titan-FF9900?style=for-the-badge&logo=amazonaws)
 ![Python](https://img.shields.io/badge/Python_3.12-3776AB?style=for-the-badge&logo=python)
 ![Kubernetes](https://img.shields.io/badge/EKS-Kubernetes-326CE5?style=for-the-badge&logo=kubernetes)
+![Terraform](https://img.shields.io/badge/Terraform-IaC-7B42BC?style=for-the-badge&logo=terraform)
 
 **A production RAG agent for company policy Q&A — gives grounded, cited answers, blocks hallucinations with a self-correction loop, guards against prompt injection, and runs on AWS EKS.**
 
