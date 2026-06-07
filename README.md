@@ -139,45 +139,42 @@ The critic acts like a reviewer who reads the retrieved chunks and asks: *"Can I
 
 ## 📂 Project Structure
 
-```text
-policy-rag/
-├── app/
-│   ├── __init__.py      # Makes app/ a Python package
-│   ├── config.py        # pydantic-settings — all config from environment variables
-│   ├── bedrock.py       # AWS Bedrock client — Nova LLM + Titan embeddings + retry logic
-│   ├── store.py         # pgvector — init DB, upsert chunks, cosine similarity search
-│   ├── graph.py         # LangGraph StateGraph — 3-node self-correction loop
-│   ├── guards.py        # Injection blocker, PII redactor, groundedness checker
-│   ├── tracing.py       # Langfuse Trace/Span wrapper — graceful no-op if keys not set
-│   └── main.py          # FastAPI — POST /chat, GET /health
-├── ingestion/
-│   ├── policy.md        # Acme Corp expense/travel policy (13 sections: hotels, meals,
-│   │                    # flights, mileage, corporate card, receipts, approvals, etc.)
-│   └── ingest.py        # Splits policy into chunks, embeds with Titan, stores in pgvector
-├── eval/
-│   ├── golden.jsonl     # 8 hand-crafted Q&A test cases
-│   ├── run_eval.py      # ragas evaluation — writes eval/report.json
-│   └── test_eval.py     # pytest quality gates (faithfulness ≥ 0.7, recall ≥ 0.6)
-├── infra/
-│   ├── main.tf          # Provider, default VPC, subnet filter (excludes us-east-1e)
-│   ├── eks.tf           # EKS cluster + t3.small node group
-│   ├── ecr.tf           # ECR repository + lifecycle policy (keep last 5 images)
-│   ├── iam.tf           # OIDC provider + IRSA role with bedrock:InvokeModel
-│   ├── variables.tf     # Input variables
-│   └── outputs.tf       # cluster_endpoint, ecr_url, irsa_role_arn
-├── k8s/
-│   ├── pgvector.yaml    # pgvector Deployment + ClusterIP Service
-│   ├── serviceaccount.yaml  # ServiceAccount with IRSA role annotation
-│   ├── app.yaml         # App Deployment + LoadBalancer Service
-│   └── ingest-job.yaml  # Kubernetes Job — runs ingestion once on cluster
-├── .env.example         # Template — copy to .env and fill in your keys
-├── .gitignore           # Ignores .env, .venv, .terraform, tfstate, report.json
-├── docker-compose.yml   # Local Postgres (pgvector/pgvector:pg16)
-├── Dockerfile           # python:3.12-slim, non-root user, uv installer
-├── Makefile             # make up / ingest / dev / eval / test / build / push / tf-apply
-├── pyproject.toml       # Dependencies + ruff linting config
-└── README.md            # This file
-```
+| File | Description |
+|------|-------------|
+| **`app/`** | |
+| [`app/__init__.py`](app/__init__.py) | Makes `app/` a Python package |
+| [`app/config.py`](app/config.py) | pydantic-settings — all config from environment variables |
+| [`app/bedrock.py`](app/bedrock.py) | AWS Bedrock client — Nova LLM + Titan embeddings + retry logic |
+| [`app/store.py`](app/store.py) | pgvector — init DB, upsert chunks, cosine similarity search |
+| [`app/graph.py`](app/graph.py) | LangGraph StateGraph — 3-node self-correction loop |
+| [`app/guards.py`](app/guards.py) | Injection blocker, PII redactor, groundedness checker |
+| [`app/tracing.py`](app/tracing.py) | Langfuse Trace/Span wrapper — graceful no-op if keys not set |
+| [`app/main.py`](app/main.py) | FastAPI — POST /chat, GET /health |
+| **`ingestion/`** | |
+| [`ingestion/policy.md`](ingestion/policy.md) | Acme Corp expense/travel policy (13 sections: hotels, meals, flights, mileage, corporate card, receipts, approvals, etc.) |
+| [`ingestion/ingest.py`](ingestion/ingest.py) | Splits policy into chunks, embeds with Titan, stores in pgvector |
+| **`eval/`** | |
+| [`eval/golden.jsonl`](eval/golden.jsonl) | 8 hand-crafted Q&A test cases |
+| [`eval/run_eval.py`](eval/run_eval.py) | ragas evaluation — writes eval/report.json |
+| [`eval/test_eval.py`](eval/test_eval.py) | pytest quality gates (faithfulness ≥ 0.7, recall ≥ 0.6) |
+| **`infra/`** | |
+| [`infra/main.tf`](infra/main.tf) | Provider, default VPC, subnet filter (excludes us-east-1e) |
+| [`infra/eks.tf`](infra/eks.tf) | EKS cluster + t3.small node group |
+| [`infra/ecr.tf`](infra/ecr.tf) | ECR repository + lifecycle policy (keep last 5 images) |
+| [`infra/iam.tf`](infra/iam.tf) | OIDC provider + IRSA role with bedrock:InvokeModel |
+| [`infra/variables.tf`](infra/variables.tf) | Input variables |
+| [`infra/outputs.tf`](infra/outputs.tf) | cluster\_endpoint, ecr\_url, irsa\_role\_arn |
+| **`k8s/`** | |
+| [`k8s/pgvector.yaml`](k8s/pgvector.yaml) | pgvector Deployment + ClusterIP Service |
+| [`k8s/serviceaccount.yaml`](k8s/serviceaccount.yaml) | ServiceAccount with IRSA role annotation |
+| [`k8s/app.yaml`](k8s/app.yaml) | App Deployment + LoadBalancer Service |
+| [`k8s/ingest-job.yaml`](k8s/ingest-job.yaml) | Kubernetes Job — runs ingestion once on cluster |
+| **Root** | |
+| [`.env.example`](.env.example) | Template — copy to .env and fill in your keys |
+| [`docker-compose.yml`](docker-compose.yml) | Local Postgres (pgvector/pgvector:pg16) |
+| [`Dockerfile`](Dockerfile) | python:3.12-slim, non-root user, uv installer |
+| [`Makefile`](Makefile) | make up / ingest / dev / eval / test / build / push / tf-apply |
+| [`pyproject.toml`](pyproject.toml) | Dependencies + ruff linting config |
 
 ---
 
