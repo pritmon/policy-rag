@@ -139,42 +139,42 @@ The critic acts like a reviewer who reads the retrieved chunks and asks: *"Can I
 
 ## 📂 Project Structure
 
-| File | Description |
+| File | What it does |
 |------|-------------|
-| **`app/`** | |
-| [`app/__init__.py`](app/__init__.py) | Makes `app/` a Python package |
-| [`app/config.py`](app/config.py) | pydantic-settings — all config from environment variables |
-| [`app/bedrock.py`](app/bedrock.py) | AWS Bedrock client — Nova LLM + Titan embeddings + retry logic |
-| [`app/store.py`](app/store.py) | pgvector — init DB, upsert chunks, cosine similarity search |
-| [`app/graph.py`](app/graph.py) | LangGraph StateGraph — 3-node self-correction loop |
-| [`app/guards.py`](app/guards.py) | Injection blocker, PII redactor, groundedness checker |
-| [`app/tracing.py`](app/tracing.py) | Langfuse Trace/Span wrapper — graceful no-op if keys not set |
-| [`app/main.py`](app/main.py) | FastAPI — POST /chat, GET /health |
-| **`ingestion/`** | |
-| [`ingestion/policy.md`](ingestion/policy.md) | Acme Corp expense/travel policy (13 sections: hotels, meals, flights, mileage, corporate card, receipts, approvals, etc.) |
-| [`ingestion/ingest.py`](ingestion/ingest.py) | Splits policy into chunks, embeds with Titan, stores in pgvector |
-| **`eval/`** | |
-| [`eval/golden.jsonl`](eval/golden.jsonl) | 8 hand-crafted Q&A test cases |
-| [`eval/run_eval.py`](eval/run_eval.py) | ragas evaluation — writes eval/report.json |
-| [`eval/test_eval.py`](eval/test_eval.py) | pytest quality gates (faithfulness ≥ 0.7, recall ≥ 0.6) |
-| **`infra/`** | |
-| [`infra/main.tf`](infra/main.tf) | Provider, default VPC, subnet filter (excludes us-east-1e) |
-| [`infra/eks.tf`](infra/eks.tf) | EKS cluster + t3.small node group |
-| [`infra/ecr.tf`](infra/ecr.tf) | ECR repository + lifecycle policy (keep last 5 images) |
-| [`infra/iam.tf`](infra/iam.tf) | OIDC provider + IRSA role with bedrock:InvokeModel |
-| [`infra/variables.tf`](infra/variables.tf) | Input variables |
-| [`infra/outputs.tf`](infra/outputs.tf) | cluster\_endpoint, ecr\_url, irsa\_role\_arn |
-| **`k8s/`** | |
-| [`k8s/pgvector.yaml`](k8s/pgvector.yaml) | pgvector Deployment + ClusterIP Service |
-| [`k8s/serviceaccount.yaml`](k8s/serviceaccount.yaml) | ServiceAccount with IRSA role annotation |
-| [`k8s/app.yaml`](k8s/app.yaml) | App Deployment + LoadBalancer Service |
-| [`k8s/ingest-job.yaml`](k8s/ingest-job.yaml) | Kubernetes Job — runs ingestion once on cluster |
-| **Root** | |
-| [`.env.example`](.env.example) | Template — copy to .env and fill in your keys |
-| [`docker-compose.yml`](docker-compose.yml) | Local Postgres (pgvector/pgvector:pg16) |
-| [`Dockerfile`](Dockerfile) | python:3.12-slim, non-root user, uv installer |
-| [`Makefile`](Makefile) | make up / ingest / dev / eval / test / build / push / tf-apply |
-| [`pyproject.toml`](pyproject.toml) | Dependencies + ruff linting config |
+| **`app/` — The main application code** | |
+| [`app/__init__.py`](app/__init__.py) | Empty file that tells Python "this folder is a package you can import from" |
+| [`app/config.py`](app/config.py) | Reads all settings (AWS region, model names, database URL) from the `.env` file so nothing is hardcoded |
+| [`app/bedrock.py`](app/bedrock.py) | Talks to AWS Bedrock — sends prompts to Nova LLM and converts text into vectors using Titan. Includes automatic retry when AWS throttles the request |
+| [`app/store.py`](app/store.py) | All database operations — creates the table, saves policy chunks, and searches for the most relevant chunks when a question comes in |
+| [`app/graph.py`](app/graph.py) | The brain — defines the 3-step pipeline: retrieve chunks → critic judges quality → write final answer. If chunks are not good enough, it loops back and tries again |
+| [`app/guards.py`](app/guards.py) | Security layer — blocks users from hijacking the AI with trick phrases, removes phone numbers and emails from answers, verifies the answer is actually supported by the policy text |
+| [`app/tracing.py`](app/tracing.py) | Records every query step-by-step in Langfuse so you can see what the agent did. Does nothing if Langfuse keys are not set |
+| [`app/main.py`](app/main.py) | The front door — receives user questions via HTTP, runs them through the pipeline, and sends back the answer with citations |
+| **`ingestion/` — Loading the policy document** | |
+| [`ingestion/policy.md`](ingestion/policy.md) | The Acme Corp expense and travel policy document — 13 sections covering hotels, meals, flights, mileage, corporate card, receipts, and approvals |
+| [`ingestion/ingest.py`](ingestion/ingest.py) | Reads the policy document, breaks it into small chunks, converts each chunk into a vector using Titan, and saves everything into the database. Run this once before the app can answer questions |
+| **`eval/` — Testing the quality of answers** | |
+| [`eval/golden.jsonl`](eval/golden.jsonl) | 8 sample questions with correct answers — used to measure how well the agent is performing |
+| [`eval/run_eval.py`](eval/run_eval.py) | Runs all 8 test questions through the agent and scores the answers for accuracy and relevance |
+| [`eval/test_eval.py`](eval/test_eval.py) | Automated pass/fail check — fails the build if answer quality drops below acceptable thresholds |
+| **`infra/` — AWS infrastructure (Terraform)** | |
+| [`infra/main.tf`](infra/main.tf) | Terraform starting point — sets up the AWS connection and finds the existing network to deploy into |
+| [`infra/eks.tf`](infra/eks.tf) | Creates the Kubernetes cluster on AWS (EKS) and the EC2 servers that run the app |
+| [`infra/ecr.tf`](infra/ecr.tf) | Creates a private Docker image storage in AWS so Kubernetes can download and run your app |
+| [`infra/iam.tf`](infra/iam.tf) | Sets up permissions so the app pod can call Bedrock without any hardcoded passwords or keys |
+| [`infra/variables.tf`](infra/variables.tf) | Defines the configurable inputs like cluster name, region, and server size |
+| [`infra/outputs.tf`](infra/outputs.tf) | Prints important values after deployment — the cluster URL, image storage URL, and IAM role ID |
+| **`k8s/` — Kubernetes deployment instructions** | |
+| [`k8s/pgvector.yaml`](k8s/pgvector.yaml) | Tells Kubernetes to run the Postgres database inside the cluster |
+| [`k8s/serviceaccount.yaml`](k8s/serviceaccount.yaml) | Gives the app pod an identity so AWS knows it is allowed to call Bedrock |
+| [`k8s/app.yaml`](k8s/app.yaml) | Tells Kubernetes to run the FastAPI app and expose it to the internet via a Load Balancer |
+| [`k8s/ingest-job.yaml`](k8s/ingest-job.yaml) | A one-time job that runs the ingestion script inside the cluster to load the policy into the database |
+| **Root files** | |
+| [`.env.example`](.env.example) | A template showing which secrets and settings you need — copy this to `.env` and fill in your values |
+| [`docker-compose.yml`](docker-compose.yml) | Starts a local Postgres database for development so you don't need to set up anything manually |
+| [`Dockerfile`](Dockerfile) | The recipe to build the app into a Docker container — packages all code and dependencies into one portable image |
+| [`Makefile`](Makefile) | Shortcut commands — type `make ingest` instead of a long Python command, `make dev` to start the app, `make tf-apply` to deploy to AWS |
+| [`pyproject.toml`](pyproject.toml) | Lists all Python libraries the project depends on and configures the code quality checker |
 
 ---
 
