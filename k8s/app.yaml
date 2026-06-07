@@ -15,7 +15,7 @@ spec:
       serviceAccountName: policy-rag-sa
       containers:
         - name: app
-          image: ECR_URL_PLACEHOLDER:latest
+          image: 020262236277.dkr.ecr.us-east-1.amazonaws.com/policy-rag:latest
           ports:
             - containerPort: 8000
           env:
@@ -24,9 +24,9 @@ spec:
             - name: AWS_REGION
               value: us-east-1
             - name: BEDROCK_LLM_MODEL_ID
-              value: anthropic.claude-haiku-4-5-20251001-v1:0
+              value: us.amazon.nova-micro-v1:0
             - name: BEDROCK_EMBED_MODEL_ID
-              value: cohere.embed-english-v3
+              value: amazon.titan-embed-text-v2:0
             - name: EMBED_DIM
               value: "1024"
             - name: LANGFUSE_PUBLIC_KEY

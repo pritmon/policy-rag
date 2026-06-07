@@ -5,8 +5,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     aws_region: str = "us-east-1"
-    bedrock_llm_model_id: str = "anthropic.claude-haiku-4-5-20251001-v1:0"
-    bedrock_embed_model_id: str = "cohere.embed-english-v3"
+    bedrock_llm_model_id: str = "us.amazon.nova-micro-v1:0"
+    bedrock_embed_model_id: str = "amazon.titan-embed-text-v2:0"
     embed_dim: int = 1024
 
     database_url: str = "postgresql://postgres:postgres@localhost:5432/policyrag"

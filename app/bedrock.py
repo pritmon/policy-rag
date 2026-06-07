@@ -45,16 +45,26 @@ def _invoke_with_retry(model_id: str, body: dict, max_retries: int = 8) -> dict:
 
 
 def llm(prompt: str, system: str = "") -> str:
-    body = {
-        "anthropic_version": "bedrock-2023-05-31",
-        "max_tokens": 1024,
-        "messages": [{"role": "user", "content": prompt}],
-    }
-    if system:
-        body["system"] = system
-
-    data = _invoke_with_retry(settings.bedrock_llm_model_id, body)
-    return data["content"][0]["text"]
+    model = settings.bedrock_llm_model_id
+    if "nova" in model or "amazon" in model.split(".")[0]:
+        # Amazon Nova / Converse-style body
+        messages = [{"role": "user", "content": [{"text": prompt}]}]
+        body: dict = {"messages": messages, "inferenceConfig": {"maxTokens": 1024}}
+        if system:
+            body["system"] = [{"text": system}]
+        data = _invoke_with_retry(model, body)
+        return data["output"]["message"]["content"][0]["text"]
+    else:
+        # Anthropic Claude on Bedrock
+        body = {
+            "anthropic_version": "bedrock-2023-05-31",
+            "max_tokens": 1024,
+            "messages": [{"role": "user", "content": prompt}],
+        }
+        if system:
+            body["system"] = system
+        data = _invoke_with_retry(model, body)
+        return data["content"][0]["text"]
 
 
 def embed(text: str) -> list[float]:

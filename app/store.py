@@ -68,7 +68,7 @@ def similarity_search(query_embedding: list[float], k: int = 4) -> list[dict]:
 
 def health_check() -> bool:
     try:
-        with get_conn() as conn:
+        with get_conn(register_vec=False) as conn:
             conn.execute("SELECT 1")
         return True
     except Exception:
