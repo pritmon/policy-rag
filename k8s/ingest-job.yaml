@@ -1,0 +1,27 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: policy-rag-ingest
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      serviceAccountName: policy-rag-sa
+      restartPolicy: OnFailure
+      containers:
+        - name: ingest
+          image: ECR_URL_PLACEHOLDER:latest
+          command: ["python", "ingestion/ingest.py"]
+          env:
+            - name: DATABASE_URL
+              value: postgresql://postgres:postgres@pgvector:5432/policyrag
+            - name: AWS_REGION
+              value: us-east-1
+            - name: BEDROCK_EMBED_MODEL_ID
+              value: cohere.embed-english-v3
+            - name: EMBED_DIM
+              value: "1024"
+            - name: LANGFUSE_PUBLIC_KEY
+              value: ""
+            - name: LANGFUSE_SECRET_KEY
+              value: ""
