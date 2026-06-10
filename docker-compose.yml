@@ -1,19 +1,35 @@
+# docker-compose.yml — Starts the database on your laptop with ONE command.
+#
+# For local development we need a Postgres database with the pgvector
+# extension (where the policy chunks + their embeddings live).
+# Instead of installing Postgres on your Mac, we run it in a container.
+#
+# Start it:  docker compose up -d     (or: make up)
+# Stop it:   docker compose down      (add -v to also erase the data)
+
 services:
   pgvector:
+    # Official Postgres 16 image with the pgvector extension pre-installed
     image: pgvector/pgvector:pg16
     environment:
+      # Username / password / database name — fine for LOCAL dev only.
+      # (Real production would use strong secrets, never plain text.)
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: policyrag
     ports:
+      # Connect from your Mac at localhost:5432 → container's 5432
       - "5432:5432"
     volumes:
+      # Keep the data on disk so it survives container restarts
       - pgdata:/var/lib/postgresql/data
     healthcheck:
+      # Docker pings the DB every 5s and marks it "healthy" when it answers
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       timeout: 5s
       retries: 10
 
 volumes:
+  # The named storage space used above
   pgdata:

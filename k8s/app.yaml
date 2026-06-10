@@ -1,9 +1,18 @@
+# app.yaml — Runs the main application in Kubernetes + exposes it to the internet.
+#
+# Two things are defined here (separated by ---):
+#   1. Deployment   → "keep one app pod running, restart it if it dies"
+#   2. Service (LoadBalancer) → "give it a public internet address"
+#
+# The Service type LoadBalancer makes AWS create a real load balancer
+# with a public URL — that's how the outside world reaches the app.
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: policy-rag-app
 spec:
-  replicas: 1
+  replicas: 1                          # one copy of the app (can scale up later)
   selector:
     matchLabels:
       app: policy-rag-app
@@ -12,17 +21,21 @@ spec:
       labels:
         app: policy-rag-app
     spec:
+      # The "ID card" that gives this pod AWS permissions (see serviceaccount.yaml)
       serviceAccountName: policy-rag-sa
       containers:
         - name: app
+          # The Docker image we built and pushed to ECR
           image: 020262236277.dkr.ecr.us-east-1.amazonaws.com/policy-rag:latest
           ports:
-            - containerPort: 8000
+            - containerPort: 8000      # the app listens on door 8000
           env:
+            # Where the database lives ("pgvector" = the Service in pgvector.yaml)
             - name: DATABASE_URL
               value: postgresql://postgres:postgres@pgvector:5432/policyrag
             - name: AWS_REGION
               value: us-east-1
+            # Bedrock model IDs (used when provider is "bedrock")
             - name: BEDROCK_LLM_MODEL_ID
               value: us.amazon.nova-micro-v1:0
             - name: BEDROCK_EMBED_MODEL_ID
@@ -36,10 +49,12 @@ spec:
             - name: GEMINI_API_KEY
               valueFrom:
                 secretKeyRef:
-                  name: gemini-secret
+                  name: gemini-secret  # created with: kubectl create secret ...
                   key: api_key
+            # Gemini embeddings are 768 numbers (Titan's are 1024)
             - name: EMBED_DIM
               value: "768"
+            # Langfuse tracing keys — optional, app works fine without them
             - name: LANGFUSE_PUBLIC_KEY
               valueFrom:
                 secretKeyRef:
@@ -52,12 +67,16 @@ spec:
                   name: langfuse-secret
                   key: secret_key
                   optional: true
+          # Readiness: "is the app ready for visitors?" — checked before
+          # any traffic is sent to it
           readinessProbe:
             httpGet:
               path: /health
               port: 8000
             initialDelaySeconds: 10
             periodSeconds: 10
+          # Liveness: "is the app still alive?" — if this fails repeatedly,
+          # Kubernetes kills the pod and starts a fresh one
           livenessProbe:
             httpGet:
               path: /health
@@ -65,6 +84,9 @@ spec:
             initialDelaySeconds: 20
             periodSeconds: 30
 ---
+# The public front door. type: LoadBalancer tells AWS to create a real
+# internet-facing load balancer with its own URL. Visitors hit port 80
+# (normal web port) and get forwarded to the app's port 8000.
 apiVersion: v1
 kind: Service
 metadata:
@@ -72,7 +94,7 @@ metadata:
 spec:
   type: LoadBalancer
   selector:
-    app: policy-rag-app
+    app: policy-rag-app              # send traffic to the app pods
   ports:
-    - port: 80
-      targetPort: 8000
+    - port: 80                       # public door (internet side)
+      targetPort: 8000               # app door (inside the pod)

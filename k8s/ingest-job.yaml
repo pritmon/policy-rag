@@ -1,18 +1,32 @@
+# ingest-job.yaml — Loads the policy document into the cluster's database.
+#
+# A Job is a "run once and finish" task (unlike a Deployment, which runs
+# forever). This Job runs ingestion/ingest.py inside the cluster:
+#   read policy.md → chunk → embed → store in pgvector → exit.
+#
+# Re-run it when the policy document or the embedding model changes:
+#   kubectl delete job policy-rag-ingest   (jobs can't be re-applied in place)
+#   kubectl apply -f k8s/ingest-job.yaml
+
 apiVersion: batch/v1
 kind: Job
 metadata:
   name: policy-rag-ingest
 spec:
-  backoffLimit: 3
+  backoffLimit: 3                    # if it crashes, retry up to 3 times
   template:
     spec:
+      # Same AWS "ID card" as the app (needed when embedding via Bedrock)
       serviceAccountName: policy-rag-sa
-      restartPolicy: OnFailure
+      restartPolicy: OnFailure       # restart the container only if it fails
       containers:
         - name: ingest
+          # Same image as the app — it contains ingestion/ingest.py too
           image: 020262236277.dkr.ecr.us-east-1.amazonaws.com/policy-rag:latest
+          # Override the default command: run the ingest script, not the web server
           command: ["python", "ingestion/ingest.py"]
           env:
+            # Same database the app reads from
             - name: DATABASE_URL
               value: postgresql://postgres:postgres@pgvector:5432/policyrag
             - name: AWS_REGION
@@ -27,8 +41,10 @@ spec:
                 secretKeyRef:
                   name: gemini-secret
                   key: api_key
+            # Gemini embeddings are 768 numbers (Titan's are 1024)
             - name: EMBED_DIM
               value: "768"
+            # Tracing off for this one-shot job
             - name: LANGFUSE_PUBLIC_KEY
               value: ""
             - name: LANGFUSE_SECRET_KEY

@@ -1,21 +1,35 @@
+# pgvector.yaml — Runs the database INSIDE the Kubernetes cluster.
+#
+# Two things are defined here (separated by ---):
+#   1. Deployment → "keep one pgvector database pod running at all times"
+#   2. Service    → "give it the fixed name 'pgvector' so the app can find it"
+#
+# The app connects to it at: postgresql://postgres:postgres@pgvector:5432/policyrag
+# (that "pgvector" hostname works because of the Service below)
+#
+# NOTE: this is a demo setup. The data lives in emptyDir, which is wiped
+# if the pod restarts. Production would use AWS RDS or a persistent volume.
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: pgvector
 spec:
-  replicas: 1
+  replicas: 1                      # exactly one copy of the database
   selector:
     matchLabels:
       app: pgvector
   template:
     metadata:
       labels:
-        app: pgvector
+        app: pgvector              # the name tag the Service looks for
     spec:
       containers:
         - name: pgvector
+          # Postgres 16 with the pgvector extension pre-installed
           image: pgvector/pgvector:pg16
           env:
+            # Login details — fine for a demo, use secrets in production
             - name: POSTGRES_USER
               value: postgres
             - name: POSTGRES_PASSWORD
@@ -23,26 +37,29 @@ spec:
             - name: POSTGRES_DB
               value: policyrag
           ports:
-            - containerPort: 5432
+            - containerPort: 5432  # the standard Postgres door
           volumeMounts:
             - name: pgdata
               mountPath: /var/lib/postgresql/data
           readinessProbe:
+            # Kubernetes pings the DB every 5s — only sends traffic when ready
             exec:
               command: ["pg_isready", "-U", "postgres"]
             initialDelaySeconds: 5
             periodSeconds: 5
       volumes:
         - name: pgdata
-          emptyDir: {}
+          emptyDir: {}             # temporary disk — erased if pod restarts
 ---
+# The Service gives the database a permanent address inside the cluster.
+# Pods come and go (new IPs each time), but "pgvector:5432" always works.
 apiVersion: v1
 kind: Service
 metadata:
   name: pgvector
 spec:
   selector:
-    app: pgvector
+    app: pgvector                  # send traffic to pods with this label
   ports:
     - port: 5432
       targetPort: 5432
