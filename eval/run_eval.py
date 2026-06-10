@@ -74,10 +74,18 @@ def main():
     # The examiner (ragas + OpenAI judge) marks every answer
     print("Scoring with ragas...")
     result = evaluate(dataset, metrics=[faithfulness, answer_relevancy, context_recall])
+
+    def avg(metric: str) -> float:
+        """ragas returns one score per question — average them into one mark."""
+        value = result[metric]
+        if isinstance(value, list):
+            return sum(value) / len(value)
+        return float(value)
+
     scores = {
-        "faithfulness": float(result["faithfulness"]),
-        "answer_relevancy": float(result["answer_relevancy"]),
-        "context_recall": float(result["context_recall"]),
+        "faithfulness": avg("faithfulness"),
+        "answer_relevancy": avg("answer_relevancy"),
+        "context_recall": avg("context_recall"),
     }
     print("Scores:", scores)
 

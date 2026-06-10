@@ -19,6 +19,7 @@ Why the retry logic?
 """
 
 import json
+import re
 import time
 
 import boto3
@@ -30,15 +31,22 @@ from app.config import settings
 # Base URL for all Google Gemini API calls
 _GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 
+# Speed governor for the free tier: remember when we last called the
+# Gemini LLM, and never call it faster than once every _MIN_GAP seconds.
+# This prevents bursts (critic + synthesizer back-to-back) from slamming
+# into the requests-per-minute wall in the first place.
+_MIN_GAP = 10.0  # seconds between LLM calls
+_last_llm_call = 0.0
 
-def _gemini_post(url: str, body: dict, max_retries: int = 6) -> dict:
+
+def _gemini_post(url: str, body: dict, max_retries: int = 10) -> dict:
     """
     Call the Gemini REST API with retry on rate-limit (HTTP 429) errors.
 
-    Gemini's free tier allows ~15 requests per minute — if we go faster,
-    Google replies 429 and we wait before retrying (5s, 10s, 20s...).
+    Gemini's free tier allows ~20 requests per minute — if we go faster,
+    Google replies 429 and even tells us how long to wait ("retry in 37s").
+    We read that hint and wait exactly that long (plus a small buffer).
     """
-    delay = 5.0
     for attempt in range(max_retries):
         resp = httpx.post(
             url,
@@ -47,7 +55,12 @@ def _gemini_post(url: str, body: dict, max_retries: int = 6) -> dict:
             timeout=60,
         )
         if resp.status_code == 429 and attempt < max_retries - 1:
-            wait = delay * (2 ** attempt)
+            # Google's error message includes "Please retry in 37.5s" —
+            # use that if present, otherwise wait a safe 45 seconds.
+            wait = 45.0
+            match = re.search(r"retry in ([\d.]+)s", resp.text)
+            if match:
+                wait = float(match.group(1)) + 2  # small safety buffer
             print(f"  Gemini rate-limited, waiting {wait:.0f}s "
                   f"(attempt {attempt + 1}/{max_retries})")
             time.sleep(wait)
@@ -122,8 +135,30 @@ def llm(prompt: str, system: str = "") -> str:
 
     The model family is detected automatically from the model ID in settings.
     """
+    # --- OpenAI path (paid, no free-tier speed limits) ---
+    if settings.llm_provider == "openai":
+        messages = []
+        if system:
+            messages.append({"role": "system", "content": system})
+        messages.append({"role": "user", "content": prompt})
+        resp = httpx.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers={"Authorization": f"Bearer {settings.openai_api_key}"},
+            json={"model": settings.openai_model, "messages": messages, "max_tokens": 1024},
+            timeout=60,
+        )
+        resp.raise_for_status()
+        return resp.json()["choices"][0]["message"]["content"]
+
     # --- Gemini path (free Google API) ---
     if settings.llm_provider == "gemini":
+        # Speed governor: wait if the last LLM call was under _MIN_GAP ago
+        global _last_llm_call
+        gap = time.time() - _last_llm_call
+        if gap < _MIN_GAP:
+            time.sleep(_MIN_GAP - gap)
+        _last_llm_call = time.time()
+
         body: dict = {
             "contents": [{"parts": [{"text": prompt}]}],
             "generationConfig": {"maxOutputTokens": 1024},

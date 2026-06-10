@@ -18,7 +18,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     # --- Provider Switch ---
-    # Which AI provider to use for the LLM: "bedrock" (AWS) or "gemini" (Google, free tier).
+    # Which AI provider to use for the LLM:
+    #   "bedrock" (AWS) / "gemini" (Google, free) / "openai" (paid, reliable)
     # Lets us swap the brain without touching the rest of the app.
     llm_provider: str = "bedrock"
     # Which provider for embeddings: "bedrock" (Titan) or "gemini" (Google, free tier).
@@ -31,6 +32,12 @@ class Settings(BaseSettings):
     gemini_model: str = "gemini-2.5-flash-lite"
     # Google's embedding model — we request 768 dimensions (matches EMBED_DIM)
     gemini_embed_model: str = "gemini-embedding-001"
+
+    # --- OpenAI (used when llm_provider=openai) ---
+    # Also used by ragas as the eval judge (it reads OPENAI_API_KEY itself)
+    openai_api_key: str = ""
+    # gpt-4o-mini — small, cheap, reliable; good enough for policy Q&A
+    openai_model: str = "gpt-4o-mini"
 
     # --- AWS ---
     # Which AWS region to use for Bedrock calls
