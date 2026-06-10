@@ -458,20 +458,20 @@ The critic decides whether to accept the retrieved chunks or demand another atte
 
 This project is **production-shaped, not production-hardened** — it demonstrates the full path from code to cloud, with deliberate demo-grade shortcuts. Here's what separates it from a true production deployment, in priority order:
 
-| # | Gap (current state) | Production fix |
+| # | What's missing today (and why it matters) | How production would fix it |
 |---|---|---|
-| 1 | Database password is plain text in YAML | AWS Secrets Manager / External Secrets Operator |
-| 2 | Database data in `emptyDir` — lost on pod restart | Amazon RDS for PostgreSQL, or a PersistentVolume |
-| 3 | Plain HTTP on the load balancer | HTTPS via ACM certificate + custom domain |
-| 4 | Single app replica on a single node | 2+ replicas, multi-AZ node group, HorizontalPodAutoscaler |
-| 5 | No CI/CD — builds and deploys are manual | GitHub Actions: test → build → push → deploy on every merge |
-| 6 | No monitoring or alerting | CloudWatch dashboards, error-rate alerts, AWS Budgets cost alarm |
-| 7 | Kubernetes 1.30 (extended support ends Jul 2026) | Upgrade to a current EKS version |
-| 8 | Eval `answer_relevancy` metric returns NaN (ragas embedding wiring) | Pin compatible ragas/langchain versions; capture true retrieved chunks as eval contexts |
-| 9 | Terraform state stored locally | S3 backend with DynamoDB state locking |
-| 10 | Root AWS user used for administration | IAM user with MFA + least-privilege roles |
+| 1 | **Database password is written openly in a YAML file.** Anyone who sees the file sees the password — like writing your ATM PIN on the card | Keep passwords in a locked vault (AWS Secrets Manager) and let the app fetch them at runtime |
+| 2 | **Database data is wiped if the database pod restarts.** All stored policy chunks vanish and ingestion must be re-run | Use a real managed database (Amazon RDS) that keeps data safe on permanent storage |
+| 3 | **The app runs on plain HTTP, not HTTPS.** Traffic between user and app is not encrypted — like sending a postcard instead of a sealed envelope | Add a free AWS certificate and a proper domain name so all traffic is encrypted |
+| 4 | **Only one copy of the app on one server.** If that pod or server dies, the app is down until Kubernetes restarts it | Run 2+ copies spread across different data centres, with auto-scaling when traffic grows |
+| 5 | **Every deploy is done by hand** (build, push, kubectl...). Easy to forget a step or ship untested code | A robot pipeline (GitHub Actions): every code push automatically runs tests, builds, and deploys |
+| 6 | **Nobody is watching the app.** If it starts failing at 3 AM, no one knows until a user complains | Dashboards + automatic alerts ("error rate high!", "bill crossed ₹500!") sent to your phone/email |
+| 7 | **Kubernetes version 1.30 is getting old** — AWS stops supporting it in July 2026 | Upgrade the cluster to a current version (a few clicks + testing) |
+| 8 | **One eval score (answer_relevancy) shows NaN** — a version clash inside the eval library, not an app bug | Pin matching library versions so all three report-card scores print properly |
+| 9 | **Terraform's memory file lives only on this laptop.** If the laptop dies, Terraform forgets what it built in AWS | Store that file in S3 (cloud) with a lock so two people can't change infra at the same time |
+| 10 | **The AWS root account is used for everything** — like using the master key of a building for daily chores | Create a normal IAM user with MFA (OTP login) and only the permissions it needs |
 
-> Knowing these gaps is the point: every item is a conscious trade-off made to keep a learning/demo project cheap and simple, not an oversight.
+> **The honest point:** none of these are mistakes — they are shortcuts chosen on purpose to keep a learning project cheap and simple. Knowing exactly where the shortcuts are is what matters.
 
 ---
 
