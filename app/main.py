@@ -1,7 +1,9 @@
 """
 main.py — FastAPI application entry point.
 
-Exposes two HTTP endpoints:
+Exposes three HTTP endpoints:
+
+  GET  /       — The chat website (a simple, clean page for asking questions).
 
   POST /chat   — Accept a user question, run it through the RAG pipeline,
                  return a cited answer with any warning flags.
@@ -20,8 +22,10 @@ Request/Response shapes:
 """
 
 import logging
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from app.config import settings
@@ -43,6 +47,16 @@ class ChatResponse(BaseModel):
     answer: str         # the final answer with inline citations
     citations: list[str]  # list of policy section names referenced
     flags: list[str]    # warning flags: "blocked", "ungrounded", "pii_redacted", "no_context"
+
+
+# Path to the chat website file (app/static/index.html)
+_INDEX = Path(__file__).parent / "static" / "index.html"
+
+
+@app.get("/")
+def home():
+    """Serve the chat website — what visitors see in their browser."""
+    return FileResponse(_INDEX)
 
 
 @app.post("/chat", response_model=ChatResponse)
