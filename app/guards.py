@@ -14,7 +14,7 @@ Why these matter:
 
 import re
 
-from app.bedrock import llm
+from app.llm import llm
 
 # List of regex patterns that indicate a prompt injection attempt.
 # If any of these match the user's input, we block the request immediately.

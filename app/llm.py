@@ -1,5 +1,5 @@
 """
-bedrock.py — All communication with the AI provider (AWS Bedrock or Google Gemini).
+llm.py — All communication with the AI provider (AWS Bedrock or Google Gemini).
 
 This file handles two things:
   1. llm()   — Send a prompt to the LLM, get a text answer back

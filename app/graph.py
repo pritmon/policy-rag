@@ -25,9 +25,9 @@ from typing import TypedDict
 
 from langgraph.graph import END, StateGraph
 
-from app.bedrock import embed_query, llm
 from app.config import settings
 from app.guards import check_groundedness, redact_pii
+from app.llm import embed_query, llm
 from app.store import similarity_search
 from app.tracing import Trace
 

@@ -18,7 +18,7 @@ import time
 # Allow "from app.xxx import ..." even though this file lives in ingestion/
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from app.bedrock import embed
+from app.llm import embed
 from app.store import init_db, upsert_chunks
 
 # Where the policy document lives
