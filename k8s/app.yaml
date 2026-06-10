@@ -51,6 +51,10 @@ spec:
                 secretKeyRef:
                   name: gemini-secret  # created with: kubectl create secret ...
                   key: api_key
+            # Which Gemini model answers questions (each model has its own
+            # free-tier quota bucket — switch here if one runs out for the day)
+            - name: GEMINI_MODEL
+              value: gemini-2.5-flash
             # Gemini embeddings are 768 numbers (Titan's are 1024)
             - name: EMBED_DIM
               value: "768"
