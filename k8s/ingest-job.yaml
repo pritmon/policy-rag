@@ -19,8 +19,16 @@ spec:
               value: us-east-1
             - name: BEDROCK_EMBED_MODEL_ID
               value: amazon.titan-embed-text-v2:0
+            # Gemini provider (temporary while Bedrock quota is restored)
+            - name: EMBED_PROVIDER
+              value: gemini
+            - name: GEMINI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: gemini-secret
+                  key: api_key
             - name: EMBED_DIM
-              value: "1024"
+              value: "768"
             - name: LANGFUSE_PUBLIC_KEY
               value: ""
             - name: LANGFUSE_SECRET_KEY
