@@ -1,24 +1,60 @@
 """
-bedrock.py — All communication with AWS Bedrock (the AI service).
+bedrock.py — All communication with the AI provider (AWS Bedrock or Google Gemini).
 
 This file handles two things:
-  1. llm()   — Send a prompt to Nova LLM, get a text answer back
-  2. embed() — Send text to Titan, get a list of 1024 numbers back (a vector)
+  1. llm()   — Send a prompt to the LLM, get a text answer back
+  2. embed() — Send text to the embedding model, get a vector of numbers back
+
+Provider switch (set in .env):
+  LLM_PROVIDER=bedrock → AWS Nova Micro      LLM_PROVIDER=gemini → Google Gemini Flash
+  EMBED_PROVIDER=bedrock → AWS Titan Embed   EMBED_PROVIDER=gemini → Google text-embedding-004
+
+The rest of the app never knows which provider is active — it just calls
+llm() and embed(). That's why switching providers needs zero changes elsewhere.
 
 Why the retry logic?
-  AWS Bedrock has rate limits (throttling). If you send too many requests
-  too fast, AWS returns a ThrottlingException. Instead of crashing, we
-  wait and try again — starting at 5 seconds, doubling each time (5s, 10s, 20s...).
-  This is called exponential backoff.
+  All AI APIs have rate limits (throttling). If you send too many requests
+  too fast, they return an error. Instead of crashing, we wait and try
+  again — doubling the wait each time. This is called exponential backoff.
 """
 
 import json
 import time
 
 import boto3
+import httpx
 from botocore.exceptions import ClientError
 
 from app.config import settings
+
+# Base URL for all Google Gemini API calls
+_GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
+
+
+def _gemini_post(url: str, body: dict, max_retries: int = 6) -> dict:
+    """
+    Call the Gemini REST API with retry on rate-limit (HTTP 429) errors.
+
+    Gemini's free tier allows ~15 requests per minute — if we go faster,
+    Google replies 429 and we wait before retrying (5s, 10s, 20s...).
+    """
+    delay = 5.0
+    for attempt in range(max_retries):
+        resp = httpx.post(
+            url,
+            params={"key": settings.gemini_api_key},
+            json=body,
+            timeout=60,
+        )
+        if resp.status_code == 429 and attempt < max_retries - 1:
+            wait = delay * (2 ** attempt)
+            print(f"  Gemini rate-limited, waiting {wait:.0f}s "
+                  f"(attempt {attempt + 1}/{max_retries})")
+            time.sleep(wait)
+            continue
+        resp.raise_for_status()
+        return resp.json()
+    raise RuntimeError("Gemini API: ran out of retries")
 
 # Cached Bedrock client — created once and reused for every call
 _bedrock = None
@@ -86,6 +122,18 @@ def llm(prompt: str, system: str = "") -> str:
 
     The model family is detected automatically from the model ID in settings.
     """
+    # --- Gemini path (free Google API) ---
+    if settings.llm_provider == "gemini":
+        body: dict = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"maxOutputTokens": 1024},
+        }
+        if system:
+            body["systemInstruction"] = {"parts": [{"text": system}]}
+        data = _gemini_post(f"{_GEMINI_BASE}/{settings.gemini_model}:generateContent", body)
+        return data["candidates"][0]["content"]["parts"][0]["text"]
+
+    # --- Bedrock path (AWS) ---
     model = settings.bedrock_llm_model_id
 
     if "nova" in model or "amazon" in model.split(".")[0]:
@@ -117,6 +165,18 @@ def embed(text: str) -> list[float]:
     Used during ingestion — each policy chunk gets embedded and stored in pgvector.
     Uses 'search_document' input type for Cohere, standard format for Titan.
     """
+    # --- Gemini path: RETRIEVAL_DOCUMENT tells Google this is a stored chunk ---
+    if settings.embed_provider == "gemini":
+        body = {
+            "content": {"parts": [{"text": text}]},
+            "taskType": "RETRIEVAL_DOCUMENT",
+            # Gemini's default is 3072 numbers; we ask for embed_dim (768)
+            "outputDimensionality": settings.embed_dim,
+        }
+        data = _gemini_post(
+            f"{_GEMINI_BASE}/{settings.gemini_embed_model}:embedContent", body)
+        return data["embedding"]["values"]
+
     model = settings.bedrock_embed_model_id
 
     if model.startswith("cohere.embed"):
@@ -139,6 +199,17 @@ def embed_query(text: str) -> list[float]:
     this tells the model the text is a search query, not a document,
     which improves retrieval accuracy.
     """
+    # --- Gemini path: RETRIEVAL_QUERY tells Google this is a search question ---
+    if settings.embed_provider == "gemini":
+        body = {
+            "content": {"parts": [{"text": text}]},
+            "taskType": "RETRIEVAL_QUERY",
+            "outputDimensionality": settings.embed_dim,
+        }
+        data = _gemini_post(
+            f"{_GEMINI_BASE}/{settings.gemini_embed_model}:embedContent", body)
+        return data["embedding"]["values"]
+
     model = settings.bedrock_embed_model_id
 
     if model.startswith("cohere.embed"):

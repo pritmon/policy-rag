@@ -17,6 +17,21 @@ class Settings(BaseSettings):
     # Tell pydantic to read from .env file; ignore unknown keys
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
+    # --- Provider Switch ---
+    # Which AI provider to use for the LLM: "bedrock" (AWS) or "gemini" (Google, free tier).
+    # Lets us swap the brain without touching the rest of the app.
+    llm_provider: str = "bedrock"
+    # Which provider for embeddings: "bedrock" (Titan) or "gemini" (Google, free tier).
+    embed_provider: str = "bedrock"
+
+    # --- Google Gemini (used when provider=gemini) ---
+    # Free API key from https://aistudio.google.com
+    gemini_api_key: str = ""
+    # Gemini 2.5 Flash Lite — fast, free tier, stronger than Nova Micro
+    gemini_model: str = "gemini-2.5-flash-lite"
+    # Google's embedding model — we request 768 dimensions (matches EMBED_DIM)
+    gemini_embed_model: str = "gemini-embedding-001"
+
     # --- AWS ---
     # Which AWS region to use for Bedrock calls
     aws_region: str = "us-east-1"
